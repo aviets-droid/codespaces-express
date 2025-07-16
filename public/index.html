@@ -2,10 +2,10 @@
 <html>
     <head>
         <meta charset="utf-8">
-        <link rel="stylesheet" type="text/css" href="style.css">
+        <link rel="stylesheet" type="text/css" href="/static/style.css">
     </head>
     <body>
-        <p>Title</p>
+        <p id="titletext">4x4 Tic Tac Toe</p>
         <script>
             let table = document.createElement('table');
             let rows = 4;
@@ -21,6 +21,7 @@
             }
             document.body.appendChild(table);
         </script>
+        <button id="button">Flip</button>
     </body>
-    <script src="client.js"></script>
+    <script src="/static/client.js"></script>
 </html>
