@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <link rel="stylesheet" type="text/css" href="style.css">
+    </head>
+    <body>
+        <p>Title</p>
+        <script>
+            let table = document.createElement('table');
+            let rows = 4;
+            let cols = 4;
+            let whitespace = "\u00A0";
+            table.id = "board";
+            for (let i=1; i<=rows; i++) {
+                let row = table.insertRow();
+                for (let j=1; j<=cols; j++) {
+                    let cell = row.insertCell();
+                    cell.appendChild(document.createTextNode(whitespace));
+                }
+            }
+            document.body.appendChild(table);
+        </script>
+    </body>
+    <script src="client.js"></script>
+</html>
