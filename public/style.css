@@ -1,16 +1,38 @@
-body{
+body {
+    display: flex;
     align-items: center; 
     justify-content: center;
     background-color: white;
+    height: 40vh;
+    margin: 0;
+    flex-direction: column;
 }
 
 table, td {
     border: 1px solid black;
-    border-collapse: collapse;
+    /* border-collapse: collapse; */
+    background-color:lightgrey;
 }
 
 td {
+    font-size: 20px;
     width: 40px;
     height: 40px;
     text-align: center;
+    background-color:white;
+}
+
+.cell:hover {
+    background-color:aliceblue;
+    cursor: pointer;
+}
+
+/* td:hover {
+    background-color:aliceblue;
+    cursor: pointer;
+} */
+
+button {
+    margin-top: 10px;
+    width: 60px;
 }

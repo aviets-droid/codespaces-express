@@ -6,22 +6,11 @@
     </head>
     <body>
         <p id="titletext">4x4 Tic Tac Toe</p>
+        <script src="/static/client.js"></script>
         <script>
-            let table = document.createElement('table');
-            let rows = 4;
-            let cols = 4;
-            let whitespace = "\u00A0";
-            table.id = "board";
-            for (let i=1; i<=rows; i++) {
-                let row = table.insertRow();
-                for (let j=1; j<=cols; j++) {
-                    let cell = row.insertCell();
-                    cell.appendChild(document.createTextNode(whitespace));
-                }
-            }
-            document.body.appendChild(table);
+            window.addEventListener("DOMContentLoaded", () => {
+                createDisplay();
+            })
         </script>
-        <button id="button">Flip</button>
     </body>
-    <script src="/static/client.js"></script>
 </html>
