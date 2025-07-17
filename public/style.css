@@ -22,15 +22,14 @@ td {
     background-color:white;
 }
 
-.cell:hover {
+.cell:not(.filled):hover {
     background-color:aliceblue;
     cursor: pointer;
 }
 
-/* td:hover {
-    background-color:aliceblue;
-    cursor: pointer;
-} */
+.filled {
+    background-color:lightgrey;
+}
 
 button {
     margin-top: 10px;
