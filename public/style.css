@@ -22,13 +22,21 @@ td {
     background-color:white;
 }
 
-.cell:not(.filled):hover {
+.cell:not(.filled, .winner):hover {
     background-color:aliceblue;
     cursor: pointer;
 }
 
-.filled {
+.filled:not(.winner, .winner_other) {
     background-color:lightgrey;
+}
+
+.winner {
+    background-color:lightgreen;
+}
+
+.winner_other {
+    background-color: lightcoral;
 }
 
 button {
