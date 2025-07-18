@@ -162,6 +162,7 @@ function checkBoardWinner() {
         let arrLen = winningArr.length;
         let cellclass = "";
 
+        // Setting class to use for cell styling
         if (winnerChar == myChar) {
             cellclass = "winner";
         }
@@ -169,8 +170,27 @@ function checkBoardWinner() {
             cellclass = "winner_other";
         }
 
+        // Add class
         for (let i=0; i<arrLen; i++) {
             winningArr[i].classList.add(cellclass);
+        }
+
+        // Make all cells unclickable
+        // setCellClickability(false);
+    }
+}
+
+// Change clickability of every cell on the board
+function setCellClickability(bool) {
+    for (let i=0; i<boardRows; i++) {
+        for (let j=0; j<boardCols; j++) {
+            let cell = boardData[i][j];
+            if (bool) {
+                cell.addEventListener('click', onCellClick);
+            }
+            else {
+                cell.removeEventListener('click', onCellClick);
+            }
         }
     }
 }
