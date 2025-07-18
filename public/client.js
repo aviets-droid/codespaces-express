@@ -7,15 +7,10 @@ let myChar = "O"; // Make empty later
 let boardData = []; // Filled with references to cells on page load, edit board with boardData[#][#].cell.textContent
 let gameStarted = true; // Toggle true for testing
 let connectionOrder = 0; // # following join order, i.e. 1st 2nd etc
+let numPlayersOK = false;
 
 let winnerExists = false;
 let winnerChar = "";
-
-// Todo: get/post this to/from server json
-let gameData = {
-    connectedPlayers: 0,
-    board: [],
-}
 
 //
 connectToServer();
@@ -24,6 +19,43 @@ setInterval(pollServer, POLLINTERVAL);
 
 async function pollServer() {
     // Todo: Enable button if connectedPlayers is == 2
+    try {
+        const conns = await fetch('/conns');
+        const conns_response = await conns.text();
+        numPlayersOK = conns_response === "true";
+    }
+    catch (error) {
+        console.error("Error retrieving number of connected players: " + error);
+    }
+
+    if (!numPlayersOK) {
+        let button = document.getElementById('button');
+        button.disabled = true;
+        updateInfoBar("Too many/too few players connected. Accepted number of players is 2.");
+    }
+
+    else {
+        if (button.textContent == "Flip") {
+            if (connectionOrder == 1) {
+                button.disabled = false;
+                updateInfoBar("Press flip to begin.");
+            }
+            else {
+                button.disabled = true;
+                updateInfoBar("Waiting on player 1 to flip...");
+            }
+        }
+        else if (button.textContent == "Start") {
+            button.disabled = false;
+            updateInfoBar("Press start to begin.");
+        }
+        else {
+            button.disabled = false;
+            updateInfoBar("Press clear to restart the game.");
+        }
+    }
+
+    console.log("numPlayersOK: " + numPlayersOK);
     // etc
     return;
 }
@@ -31,13 +63,38 @@ async function pollServer() {
 // Verify client can communicate with server, track the order this client joined
 async function connectToServer() {
     try {
-        const conns = await fetch('/conns');
-        const conns_response = await conns.text();
-        console.log("I am player: " + conns_response);
-        connectionOrder = parseInt(conns_response);
+        const order = await fetch('/order');
+        const order_response = await order.text();
+        console.log("I am player: " + order_response);
+        connectionOrder = parseInt(order_response);
     }
     catch (error) {
         console.error("Server connection error: " + error);
+    }
+}
+
+async function updateServerBoard() {
+    // Map 2D array of cells to 2D array of chars in JSON format
+    const boardJSON = boardData.map(row => {
+        row.map(cell => cell.textContent);
+    });
+
+    // Send JSON to server data
+    try {
+        const sendboard = await fetch('/sendboard', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/JSON'},
+            body: JSON.stringify({board: boardJSON})
+        });
+
+        if (!sendboard.ok) {
+            throw new Error("Server error: " + sendboard.status);
+        };
+
+        console.log("Board sent to server. " + sendboard.status);
+    }
+    catch (error) {
+        console.error("Error updating server's gameboard: " + error);
     }
 }
 
@@ -47,16 +104,18 @@ function onButtonClick() {
     let buttontext = button.textContent;
     console.log(buttontext + " button clicked");
 
-    if (buttontext == "Flip") {
-        onFlip();
-        // buttontext = "Start";
-    }
-    else if (buttontext == "Start") {
-        buttontext = "Clear";
-    }
-    else if (buttontext == "Clear") {
-        clearBoard();
-        buttontext = "Start";
+    switch (buttontext) {
+        case "Flip":
+            button.textContent = "Start";
+            onFlip();
+            break;
+        case "Start":
+            button.textContent = "Clear";
+            break;
+        case "Clear":
+            button.textContent = "Start";
+            clearBoard();
+            break;
     }
 }
 
@@ -238,6 +297,5 @@ function createDisplay() {
     button.id = "button";
     button.textContent = "Flip";
     button.addEventListener('click', onButtonClick);
-    // button.disabled = true; // Disable button initially, enable it in pollServer when 2 clients connect
     document.body.appendChild(button);
 }
