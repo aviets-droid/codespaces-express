@@ -46,7 +46,7 @@ var myGame = {};
  * "X" or "O" character for this player
  * @type {?string}
  */
-var myChar = null; // Make empty later
+var myChar = null;
 
 // HTML elements
 /**
@@ -94,7 +94,17 @@ async function putToken() {
  */
 async function getToken() {
     const response = await fetch(`/board?gameID=${myGameID}`);
-    return await response.json();;
+
+    if (response.ok) { // Error checking for valid response and JSON -Ais
+        const headerCT = response.headers.get("content-type");
+        if (headerCT.includes("application/json")) {
+            return await response.json(); // Safe to parse
+        }
+        else {
+            console.warn("Empty/invalid JSON token grabbed from server.");
+            return {}; // Warn console & return empty JSON on invalid response from server
+        }
+    }
 }
 
 // #endregion
@@ -140,6 +150,7 @@ function allSameCells(arr) {
 // Check the board for a winner
 function checkBoardWinner() {
     let winningArr = [];
+    let winnerExists = false;
 
     // Row
     for (let i=0; i<BOARD_ROWS; i++) {
@@ -208,9 +219,6 @@ function checkBoardWinner() {
         for (let i=0; i<arrLen; i++) {
             winningArr[i].classList.add(cellclass);
         }
-
-        // Make all cells unclickable
-        // setCellClickability(false);
     }
 }
 
@@ -250,6 +258,23 @@ function updateInfoBar(info) {
     infobar.textContent = info;
 }
 
+/**
+ * Update board visually from boardState
+ */
+function updateBoardHTML() {
+    if (!myGame.boardState) {
+        return;
+    }
+
+    for (let i=0; i<BOARD_ROWS; i++) {
+        for (let j=0; j<BOARD_COLS; j++) {
+            boardCells[i][j].textContent = myGame.boardState[i][j];
+        }
+    }
+    
+    return;
+}
+
 // #endregion
 
 // #region Listeners
@@ -270,6 +295,7 @@ async function pollServer() {
     }
 
     myGame = pulledGame;
+    updateBoardHTML();
 
     if (myGame.playerCount !== 2) {
         let button = document.getElementById('button');
@@ -301,7 +327,7 @@ async function pollServer() {
             updateInfoBar(`Press clear to restart the game. Current player is ${myGame.currentPlayer}.`);
         }
     }
-    // etc
+
     return;
 }
 
