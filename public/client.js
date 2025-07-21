@@ -1,145 +1,79 @@
-const boardRows = 4;
-const boardCols = 4;
-const whitespace = "\u00A0";
-const POLLINTERVAL = 2000;
+// #region Global Variables
 
-let myChar = "O"; // Make empty later
-let boardData = []; // Filled with references to cells on page load, edit board with boardData[#][#].cell.textContent
-let gameStarted = true; // Toggle true for testing
-let connectionOrder = 0; // # following join order, i.e. 1st 2nd etc
-let numPlayersOK = false;
+const BOARD_ROWS = 4;
+const BOARD_COLS = 4;
+const WHITESPACE = "\u00A0";
+const POLL_INTERVAL = 1000;
 
-let winnerExists = false;
-let winnerChar = "";
+/**
+ * @typedef {object} GameInformation
+ * @property {int} gameID - Game identifier (so multiple games could be played at once).
+ * @property {string} buttonState - "needsFlip", "isWaitingToStart", "isPlaying", "hasDraw", "hasWinner" 
+ * @property {int} playerCount - Number of players connected.
+ * @property {Array<Array<string>>} boardState - Game board.
+ * @property {?string} currentPlayer - Current player to go ("X" or "O").
+ * @property {?string} firstPlayer - First player to go  ("X" or "O").
+*/
 
-//
-connectToServer();
-setInterval(pollServer, POLLINTERVAL);
-//
+// Game info
+var pollIntervalId = null;
+var myGameID = -1;
 
-async function pollServer() {
-    // Todo: Enable button if connectedPlayers is == 2
-    try {
-        const conns = await fetch('/conns');
-        const conns_response = await conns.text();
-        numPlayersOK = conns_response === "true";
-    }
-    catch (error) {
-        console.error("Error retrieving number of connected players: " + error);
-    }
+/** @type {GameInformation} */
+var myGame = {};
+var myChar = null; // Make empty later
 
-    if (!numPlayersOK) {
-        let button = document.getElementById('button');
-        button.disabled = true;
-        updateInfoBar("Too many/too few players connected. Accepted number of players is 2.");
-    }
+// HTML elements
+var button;
+var infobar;
+var boardCells = []; // Filled with references to cells on page load, edit board with boardCells[#][#].cell.textContent
 
-    else {
-        if (button.textContent == "Flip") {
-            if (connectionOrder == 1) {
-                button.disabled = false;
-                updateInfoBar("Press flip to begin.");
-            }
-            else {
-                button.disabled = true;
-                updateInfoBar("Waiting on player 1 to flip...");
-            }
-        }
-        else if (button.textContent == "Start") {
-            button.disabled = false;
-            updateInfoBar("Press start to begin.");
-        }
-        else {
-            button.disabled = false;
-            updateInfoBar("Press clear to restart the game.");
-        }
-    }
+var winnerExists = false;
+var winnerChar = "";
 
-    console.log("numPlayersOK: " + numPlayersOK);
-    // etc
-    return;
+// #endregion
+
+// #region Game Communication
+
+/**
+ * Updates game state in server.
+ * @function putToken
+ * @returns {boolean} - Success.
+ */
+async function putToken() {
+    const response = await fetch('/board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(myGame)
+    });
+    const result = await response.json();
+    return result.success;
 }
 
-// Verify client can communicate with server, track the order this client joined
-async function connectToServer() {
-    try {
-        const order = await fetch('/order');
-        const order_response = await order.text();
-        console.log("I am player: " + order_response);
-        connectionOrder = parseInt(order_response);
-    }
-    catch (error) {
-        console.error("Server connection error: " + error);
-    }
+/**
+ * Receives game's JSON file from Server.
+ * @function getToken
+ * @returns {GameInformation}
+ */
+async function getToken() {
+    const response = await fetch(`/board?gameID=${myGameID}`);
+    return await response.json();;
 }
+
+// #endregion
+
+// #region Gameplay
 
 async function updateServerBoard() {
     // Map 2D array of cells to 2D array of chars in JSON format
-    const boardJSON = boardData.map(row => {
-        row.map(cell => cell.textContent);
+    const boardJSON = boardCells.map(row => {
+        return row.map(cell => cell.textContent);
     });
 
-    // Send JSON to server data
-    try {
-        const sendboard = await fetch('/sendboard', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/JSON'},
-            body: JSON.stringify({board: boardJSON})
-        });
+    myGame.boardState = boardJSON;
+    myGame.currentPlayer = myChar === "X" ? "O" : "X";
 
-        if (!sendboard.ok) {
-            throw new Error("Server error: " + sendboard.status);
-        };
-
-        console.log("Board sent to server. " + sendboard.status);
-    }
-    catch (error) {
-        console.error("Error updating server's gameboard: " + error);
-    }
-}
-
-// Button click logic, flip/start/clear
-function onButtonClick() {
-    let button = document.getElementById("button");
-    let buttontext = button.textContent;
-    console.log(buttontext + " button clicked");
-
-    switch (buttontext) {
-        case "Flip":
-            button.textContent = "Start";
-            onFlip();
-            break;
-        case "Start":
-            button.textContent = "Clear";
-            break;
-        case "Clear":
-            button.textContent = "Start";
-            clearBoard();
-            break;
-    }
-}
-
-async function onFlip() {
-    // Flip coin to determine who goes first
-    // Communicate turn order to server
-
-    // Testing board functionality for now
-    clearBoard();
-}
-
-function onCellClick(event) {
-    // Update cell
-    const targetCell = event.target;
-    console.log("Cell clicked");
-
-    if (!gameStarted || targetCell.classList.contains("filled")) {
-        return;
-    }
-    else {
-        targetCell.textContent = myChar;
-        targetCell.classList.add("filled");
-        checkBoardWinner();
-    }
+    await putToken();
 }
 
 // Given an array of cells, check the textContent of all elements, return true if all equal
@@ -153,7 +87,7 @@ function allSameCells(arr) {
     }
 
     // Return false if there's whitespace anywhere
-    if (charArr.includes(whitespace)) {
+    if (charArr.includes(WHITESPACE)) {
         return false;
     }
 
@@ -167,8 +101,8 @@ function checkBoardWinner() {
     let winningArr = [];
 
     // Row
-    for (let i=0; i<boardRows; i++) {
-        let rowArr = boardData[i];
+    for (let i=0; i<BOARD_ROWS; i++) {
+        let rowArr = boardCells[i];
 
         if (allSameCells(rowArr)) {
             winningArr = rowArr;
@@ -178,11 +112,11 @@ function checkBoardWinner() {
     }
 
     // Column
-    for (let i=0; i<boardCols; i++) {
+    for (let i=0; i<BOARD_COLS; i++) {
         let colArr = [];
 
-        for (j=0; j<boardRows; j++) {
-            colArr.push(boardData[j][i]);
+        for (j=0; j<BOARD_ROWS; j++) {
+            colArr.push(boardCells[j][i]);
         }
 
         if (allSameCells(colArr)) {
@@ -194,8 +128,8 @@ function checkBoardWinner() {
 
     // Negative Diagonal
     let NDiagonalArr = [];
-    for (let i=0; i<boardRows; i++) {
-        NDiagonalArr.push(boardData[i][i]);
+    for (let i=0; i<BOARD_ROWS; i++) {
+        NDiagonalArr.push(boardCells[i][i]);
     }
     if (allSameCells(NDiagonalArr)) {
         winningArr = NDiagonalArr;
@@ -205,9 +139,9 @@ function checkBoardWinner() {
 
     // Positive Diagonal
     let PDiagonalArr = []
-    let maxidx = boardData.length - 1;
-    for (let i=0; i<boardRows; i++) {
-        PDiagonalArr.push(boardData[i][maxidx]);
+    let maxidx = boardCells.length - 1;
+    for (let i=0; i<BOARD_ROWS; i++) {
+        PDiagonalArr.push(boardCells[i][maxidx]);
         maxidx--;
     }
     if (allSameCells(PDiagonalArr)) {
@@ -240,36 +174,160 @@ function checkBoardWinner() {
 }
 
 // Change clickability of every cell on the board
-function setCellClickability(bool) {
-    for (let i=0; i<boardRows; i++) {
-        for (let j=0; j<boardCols; j++) {
-            let cell = boardData[i][j];
-            if (bool) {
+function setCellClickability() {
+    for (let i=0; i<BOARD_ROWS; i++) {
+        for (let j=0; j<BOARD_COLS; j++) {
+            let cell = boardCells[i][j];
+            if (myGame.buttonState === "isPlaying" 
+                && cell.textContent === WHITESPACE 
+                && myGame.currentPlayer === myChar) {   
+                cell.removeEventListener('click', onCellClick);
                 cell.addEventListener('click', onCellClick);
-            }
-            else {
+            } else {
                 cell.removeEventListener('click', onCellClick);
             }
         }
     }
 }
 
-function clearBoard() {
-    if (boardData.length != boardCols) {
+async function clearBoard() {
+    if (boardCells.length != BOARD_COLS) {
         updateInfoBar("Error: unexpected boardData length");
     };
-    console.log(boardData);
-    for (let i=0; i<boardRows; i++) {
-        for (let j=0; j<boardCols; j++) {
-            boardData[i][j].textContent = whitespace;
-            boardData[i][j].className = "cell"; // Clear all classes from cell except for cell class
+    console.log(boardCells);
+    for (let i=0; i<BOARD_ROWS; i++) {
+        for (let j=0; j<BOARD_COLS; j++) {
+            boardCells[i][j].textContent = WHITESPACE;
+            boardCells[i][j].className = "cell"; // Clear all classes from cell except for cell class
         }
     }
+
+    await putToken();
 }
 
 function updateInfoBar(info) {
-    let infobar = document.getElementById("infobar");
     infobar.textContent = info;
+}
+
+// #endregion
+
+// #region Listeners
+
+async function pollServer() {
+    if (myGameID === -1) {
+        return;
+    }
+
+    const pulledGame = await getToken();
+
+    if (JSON.stringify(myGame) === JSON.stringify(pulledGame)){
+        return;
+    }
+
+    myGame = pulledGame;
+
+    if (myGame.playerCount !== 2) {
+        let button = document.getElementById('button');
+        button.disabled = true;
+        updateInfoBar("Waiting for player 2...");
+        return;
+    } else {
+        if (myGame.buttonState === "needsFlip") {
+            button.textContent = "Flip";
+            if (myChar === "X") {
+                button.disabled = false;
+                updateInfoBar("Press flip to begin.");
+            } else {
+                button.disabled = true;
+                updateInfoBar("Waiting on X to flip...");
+            }
+        } else if (myGame.buttonState === "isWaitingToStart") {
+            button.textContent = "Start";
+            if (myGame.firstPlayer === myChar) {
+                button.disabled = false;
+                updateInfoBar("Press 'Start' to begin.");
+            } else {
+                button.disabled = true;
+                updateInfoBar(`${myGame.firstPlayer} is going first! Wait for them to start!`)
+            }
+        } else {
+            button.textContent = "Clear";
+            button.disabled = false;
+            updateInfoBar(`Press clear to restart the game. Current player is ${myGame.currentPlayer}.`);
+        }
+    }
+    // etc
+    return;
+}
+
+// Button click logic, flip/start/clear
+function onButtonClick() {
+    buttontext = button.textContent;
+    console.log(buttontext + " button clicked");
+
+    switch (buttontext) {
+        case "Flip":
+            button.textContent = "Start";
+            onFlip();
+            break;
+        case "Start":
+            button.textContent = "Clear";
+            onStart();
+            break;
+        case "Clear":
+            button.textContent = "Start";
+            onClear();
+            break;
+    }
+}
+
+async function onFlip() {
+    let playerChars = ["X", "O"];
+    myGame.firstPlayer = playerChars[Math.floor(Math.random() * 2)]; // Random number 1 - 2
+    myGame.currentPlayer = myGame.firstPlayer;
+    myGame.buttonState = "isWaitingToStart";
+    clearBoard();
+}
+
+async function onStart() {
+    myGame.buttonState = "isPlaying";
+    await putToken();
+}
+
+async function onClear(){
+    clearBoard();
+}
+
+function onCellClick(event) {
+    // Update cell
+    const targetCell = event.target;
+    console.log("Cell clicked");
+
+    if (myGame.buttonState != "isPlaying" 
+        || targetCell.classList.contains("filled") 
+        || myGame.currentPlayer !== myChar) {
+        return;
+    } else {
+        targetCell.textContent = myChar;
+        targetCell.classList.add("filled");
+        checkBoardWinner();
+        myGame.currentPlayer = myChar === "X" ? "O" : "X";
+        updateServerBoard();
+    }
+}
+
+// #endregion
+
+// #region Initialization
+
+// Verify client can communicate with server, track the order this client joined
+async function connectToServer() {
+    const connection = await fetch('/join');
+    let myInfo = await connection.json();
+    myGameID = myInfo.gameID;
+    myChar = myInfo.joinOrder === 1 ? "X" : "O";
+    updateInfoBar(`Joined game #${myGameID} as ${myChar}!`);
+    startPolling();
 }
 
 // Create display (called on HTML parsed in index.html)
@@ -279,23 +337,40 @@ function createDisplay() {
     // Game board
     let table = document.createElement('table');
     table.id = "board";
-    for (let i=0; i<boardRows; i++) {
+    for (let i=0; i<BOARD_ROWS; i++) {
         let row = table.insertRow();
-        boardData[i] = [];
-        for (let j=0; j<boardCols; j++) {
+        boardCells[i] = [];
+        for (let j=0; j<BOARD_COLS; j++) {
             let cell = row.insertCell();
-            cell.appendChild(document.createTextNode(whitespace));
+            cell.appendChild(document.createTextNode(WHITESPACE));
             cell.classList.add("cell");
             cell.addEventListener('click', onCellClick);
-            boardData[i][j] = cell;
+            boardCells[i][j] = cell;
         }
     }
     document.body.appendChild(table);
 
     // Button
-    let button = document.createElement('button');
+    button = document.createElement('button');
     button.id = "button";
-    button.textContent = "Flip";
+    button.textContent = "Waiting";
+    button.disabled = true;
     button.addEventListener('click', onButtonClick);
     document.body.appendChild(button);
+
+    // Infobar
+    infobar = document.getElementById('infobar');
+
+    connectToServer();
 }
+
+/** Starts polling the server for updates.
+ * @function startPolling
+ */
+function startPolling() {
+    if (pollIntervalId) clearInterval(pollIntervalId); // Clear any existing interval
+    pollIntervalId = setInterval(pollServer, POLL_INTERVAL); // Poll every second
+    console.log("Polling started.");
+}
+
+// #endregion

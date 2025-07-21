@@ -1,61 +1,94 @@
 const express = require('express');
 const app = express();
 const port = 3000 || process.env.PORT;
-const MAXPLAYERS = 2;
 
 const path = require('path');
 const fs = require('fs');
+const { Console } = require('console');
 
 app.use('/static', express.static(path.join(__dirname, '/public/')));
 app.use(express.json());
 
-const dataPath = path.join(__dirname, '/data/');
-const boardDataPath = path.join(dataPath, 'board/');
+const BOARD_FILE = path.join(__dirname, '/data/', 'boards.json');
 
-// Data lock(s)
-let boardLocked = false;
-
-// Other vars
-let playersConnected = 0;
+/**
+ * @typedef {object} GameInformation
+ * @property {int} gameID - Game identifier (so multiple games could be played at once).
+ * @property {string} buttonState - "needsFlip", "isWaitingToStart", "isPlaying", "hasDraw", "hasWinner" 
+ * @property {int} playerCount - Number of players connected.
+ * @property {Array<Array<string>>} boardState - Game board.
+ * @property {?string} currentPlayer - Last player to go ("X" or "O").
+ * @property {?string} firstPlayer - First player to go  ("X" or "O").
+*/
 
 app.get('/', (req, res) => {
   res.status(200).sendFile(path.join(__dirname, '/public/', 'index.html'));
 })
 
-// Get the join order, called once by each client
-app.get('/order', (req, res) => {
-  playersConnected++;
-  let order = playersConnected;
-  res.status(200).send(order.toString());
-})
-
-// Check if appropriate # of players is connected, send true or false
-app.get('/conns', (req, res) => {
-  let conns = playersConnected === 2;
-  res.status(200).send(conns.toString());
+// Join game
+app.get('/join', (req, res) => {
+  /**@type {Array<GameInformation>} */
+  var gameList = JSON.parse(fs.readFileSync(BOARD_FILE));
+  let gameID = -1;
+  let joinOrder = 0;
+  const lastGame = gameList[gameList.length - 1];
+  if (lastGame.playerCount == 2){
+    let newServer = CreateServer(lastGame.gameID);
+    gameList.push(newServer);
+    fs.writeFileSync(BOARD_FILE, JSON.stringify(gameList));
+    gameID = newServer.gameID;
+    joinOrder = 1;
+  } else {
+    const indexToUpdate = gameList.findIndex(game => game.gameID === lastGame.gameID);
+    gameList[indexToUpdate].playerCount = 2;
+    fs.writeFileSync(BOARD_FILE, JSON.stringify(gameList));
+    gameID = lastGame.gameID;
+    joinOrder = 2;
+  }
+  
+  res.json({gameID: gameID, joinOrder: joinOrder});
+  console.log(`Player ${joinOrder} joined game ${gameID}`);
 })
 
 // Get server's board data
-app.get('/getboard', (req, res) => {
-  fs.readFile(boardDataPath, 'utf8', (err, data) => {
-    if (err) {
-      console.error("Error reading board data: " + err);
-      return res.status(500).send("Failed to read board data.");
-    }
-    res.json(JSON.parse(data));
-  })
+app.get('/board', (req, res) => {
+  const gameId = parseInt(req.query.gameID);
+  const gameList = JSON.parse(fs.readFileSync(BOARD_FILE));
+  const indexToGet = gameList.findIndex(game => game.gameID === gameId);
+  res.json(gameList[indexToGet]);
 })
 
 // Update server's board data
-app.post('/sendboard', async (req, res) => {
-  if (boardLocked) {
-    // Return status code 423: resource locked
-  }
-
-  boardLocked = true;
-  const data = req.body;
+app.post('/board', async (req, res) => {
+  /** @type {GameInformation} */
+  const gameInfo = req.body;
+  /** @type {Array<GameInformation>} */
+  const gameList = JSON.parse(fs.readFileSync(BOARD_FILE));
+  const indexToUpdate = gameList.findIndex(game => game.gameID === gameInfo.gameID);
+  
+  gameList[indexToUpdate] = gameInfo;
+  
+  fs.writeFileSync(BOARD_FILE, JSON.stringify(gameList));
+  res.json({success: true});
 })
 
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
+  console.log(`App listening on port ${port}`);
 })
+
+/**
+ * 
+ * @param {int} lastGameId - Last gameID stored in boards.json
+ * @returns {GameInformation}
+ */
+function CreateServer(lastGameId){
+  let newGameId = lastGameId + 1;
+  return {
+    gameID: newGameId,
+    buttonState: "needsFlip",
+    playerCount: 1,
+    boardState: [[" "," "," "," "], [" "," "," "," "], [" "," "," "," "], [" "," "," "," "]],
+    currentPlayer: null,
+    firstPlayer: null
+  }
+}
