@@ -54,11 +54,17 @@ app.get('/board', (req, res) => {
   const gameId = parseInt(req.query.gameID);
   const gameList = JSON.parse(fs.readFileSync(BOARD_FILE));
   const indexToGet = gameList.findIndex(game => game.gameID === gameId);
+
+  if (indexToGet === -1) {
+    return res.status(404).json({ error: "Game not found"});
+  }
+
   res.json(gameList[indexToGet]);
 })
 
 // Update server's board data
 app.post('/board', async (req, res) => {
+  console.log('BODY: ', req.body);
   /** @type {GameInformation} */
   const gameInfo = req.body;
   /** @type {Array<GameInformation>} */

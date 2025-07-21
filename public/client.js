@@ -97,13 +97,15 @@ async function getToken() {
 
     if (response.ok) { // Error checking for valid response and JSON -Ais
         const headerCT = response.headers.get("content-type");
-        if (headerCT.includes("application/json")) {
+        if (headerCT?.includes("application/json")) {
             return await response.json(); // Safe to parse
+        } else {
+            console.warn("Token from server not of content type application/json.");
+            return {};
         }
-        else {
-            console.warn("Empty/invalid JSON token grabbed from server.");
-            return {}; // Warn console & return empty JSON on invalid response from server
-        }
+    } else {
+        console.warn(`Request to server failed with code ${response.status}.`);
+        return {};
     }
 }
 
@@ -219,23 +221,8 @@ function checkBoardWinner() {
         for (let i=0; i<arrLen; i++) {
             winningArr[i].classList.add(cellclass);
         }
-    }
-}
 
-// Change clickability of every cell on the board
-function setCellClickability() {
-    for (let i=0; i<BOARD_ROWS; i++) {
-        for (let j=0; j<BOARD_COLS; j++) {
-            let cell = boardCells[i][j];
-            if (myGame.buttonState === PLAYING
-                && cell.textContent === WHITESPACE 
-                && myGame.currentPlayer === myChar) {   
-                cell.removeEventListener('click', onCellClick);
-                cell.addEventListener('click', onCellClick);
-            } else {
-                cell.removeEventListener('click', onCellClick);
-            }
-        }
+        myGame.buttonState = WIN;
     }
 }
 
@@ -248,6 +235,7 @@ async function clearBoard() {
         for (let j=0; j<BOARD_COLS; j++) {
             boardCells[i][j].textContent = WHITESPACE;
             boardCells[i][j].className = "cell"; // Clear all classes from cell except for cell class
+            myGame.boardState[i][j] = WHITESPACE;
         }
     }
 
@@ -261,17 +249,24 @@ function updateInfoBar(info) {
 /**
  * Update board visually from boardState
  */
-function updateBoardHTML() {
-    if (!myGame.boardState) {
+function updateBoardHTML(winArr) {
+    if (!myGame.boardState) { // Return for falsy boardState values
         return;
+    }
+
+    if (winArr) {
+        //
     }
 
     for (let i=0; i<BOARD_ROWS; i++) {
         for (let j=0; j<BOARD_COLS; j++) {
             boardCells[i][j].textContent = myGame.boardState[i][j];
+            if (["X", "O"].includes(boardCells[i][j])) {
+                boardCells[i][j].classList.add("filled");
+            }
         }
     }
-    
+
     return;
 }
 
@@ -290,12 +285,16 @@ async function pollServer() {
 
     const pulledGame = await getToken();
 
-    if (JSON.stringify(myGame) === JSON.stringify(pulledGame)){
-        return;
+    if (pulledGame) {
+        if (JSON.stringify(myGame) === JSON.stringify(pulledGame)){
+            return;
+        }
+        myGame = pulledGame;
+    } else {
+        console.warn("Game pulled from server is stale/invalid. Skipping update due to invalid state.");
     }
 
-    myGame = pulledGame;
-    updateBoardHTML();
+    console.log("Button state: " + myGame.buttonState);
 
     if (myGame.playerCount !== 2) {
         let button = document.getElementById('button');
@@ -303,7 +302,11 @@ async function pollServer() {
         updateInfoBar("Waiting for player 2...");
         return;
     } else {
-        if (myGame.buttonState === FLIPPING) {
+        if (myGame.buttonState === WIN) {
+            button.disabled = false;
+            let winchar = (myChar === myGame.currentPlayer ? myChar : (myChar === "X" ? "O" : "X"));
+            updateInfoBar(`${winchar} has won!`);
+        } else if (myGame.buttonState === FLIPPING) {
             button.textContent = "Flip";
             if (myChar === "X") {
                 button.disabled = false;
@@ -325,6 +328,9 @@ async function pollServer() {
             button.textContent = "Clear";
             button.disabled = false;
             updateInfoBar(`Press clear to restart the game. Current player is ${myGame.currentPlayer}.`);
+            
+            checkBoardWinner();
+            updateBoardHTML();
         }
     }
 
@@ -396,9 +402,9 @@ function onCellClick(event) {
     } else {
         targetCell.textContent = myChar;
         targetCell.classList.add("filled");
-        checkBoardWinner();
         myGame.currentPlayer = myChar === "X" ? "O" : "X";
         updateServerBoard();
+        // checkBoardWinner();
     }
 }
 

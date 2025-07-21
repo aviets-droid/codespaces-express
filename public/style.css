@@ -28,7 +28,7 @@ td {
 }
 
 .filled:not(.winner, .winner_other) {
-    background-color:lightgrey;
+    background-color:aliceblue;
 }
 
 .winner {
