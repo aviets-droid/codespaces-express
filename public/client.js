@@ -1,3 +1,8 @@
+/*
+[CS491 - Assignment 4: Main] 4x4 Tic-Tac-Toe
+Aisling Viets & Nicky Victoriano | 22 July 2025
+*/
+
 // #region Global Variables
 
 const BOARD_ROWS = 4;
@@ -5,31 +10,63 @@ const BOARD_COLS = 4;
 const WHITESPACE = "\u00A0";
 const POLL_INTERVAL = 1000;
 
+// Game states (buttonState)
+const FLIPPING = "needsFlip";
+const WAITING = "isWaitingToStart";
+const PLAYING = "isPlaying";
+const DRAW = "hasDraw";
+const WIN = "hasWinner";
+
 /**
  * @typedef {object} GameInformation
  * @property {int} gameID - Game identifier (so multiple games could be played at once).
- * @property {string} buttonState - "needsFlip", "isWaitingToStart", "isPlaying", "hasDraw", "hasWinner" 
+ * @property {string} buttonState - Constants: FLIPPING, WAITING, PLAYING, DRAW, WIN
  * @property {int} playerCount - Number of players connected.
  * @property {Array<Array<string>>} boardState - Game board.
  * @property {?string} currentPlayer - Current player to go ("X" or "O").
  * @property {?string} firstPlayer - First player to go  ("X" or "O").
 */
 
-// Game info
+
 var pollIntervalId = null;
+
+/** 
+ * ID used for pulling game info
+ * @type {int} 
+ */
 var myGameID = -1;
 
-/** @type {GameInformation} */
+/** 
+ * Game state information
+ * @type {GameInformation}
+ */
 var myGame = {};
+
+/**
+ * "X" or "O" character for this player
+ * @type {?string}
+ */
 var myChar = null; // Make empty later
 
 // HTML elements
+/**
+ * Flip/Clear/Start button
+ * @type {HTMLButtonElement}
+ */
 var button;
-var infobar;
-var boardCells = []; // Filled with references to cells on page load, edit board with boardCells[#][#].cell.textContent
 
-var winnerExists = false;
-var winnerChar = "";
+/**
+ * Infobar for displaying game information
+ * @type {HTMLParagraphElement}
+ */
+var infobar;
+
+/**
+ * 2D array of cells on the board
+ * @type {Array<Array<HTMLTableCellElement>>}
+ * @description Filled with references to cells on page load, edit board with boardCells[x][x].textContent
+ */
+var boardCells = [];
 
 // #endregion
 
@@ -51,7 +88,7 @@ async function putToken() {
 }
 
 /**
- * Receives game's JSON file from Server.
+ * Receives game's JSON object from Server.
  * @function getToken
  * @returns {GameInformation}
  */
@@ -64,6 +101,10 @@ async function getToken() {
 
 // #region Gameplay
 
+/**
+ * Updates server's board data with current board state.
+ * @function updateServerBoard
+ */
 async function updateServerBoard() {
     // Map 2D array of cells to 2D array of chars in JSON format
     const boardJSON = boardCells.map(row => {
@@ -178,7 +219,7 @@ function setCellClickability() {
     for (let i=0; i<BOARD_ROWS; i++) {
         for (let j=0; j<BOARD_COLS; j++) {
             let cell = boardCells[i][j];
-            if (myGame.buttonState === "isPlaying" 
+            if (myGame.buttonState === PLAYING
                 && cell.textContent === WHITESPACE 
                 && myGame.currentPlayer === myChar) {   
                 cell.removeEventListener('click', onCellClick);
@@ -213,6 +254,10 @@ function updateInfoBar(info) {
 
 // #region Listeners
 
+/**
+ * Polls the server for updates to the game state.
+ * @function pollServer
+ */
 async function pollServer() {
     if (myGameID === -1) {
         return;
@@ -232,7 +277,7 @@ async function pollServer() {
         updateInfoBar("Waiting for player 2...");
         return;
     } else {
-        if (myGame.buttonState === "needsFlip") {
+        if (myGame.buttonState === FLIPPING) {
             button.textContent = "Flip";
             if (myChar === "X") {
                 button.disabled = false;
@@ -241,7 +286,7 @@ async function pollServer() {
                 button.disabled = true;
                 updateInfoBar("Waiting on X to flip...");
             }
-        } else if (myGame.buttonState === "isWaitingToStart") {
+        } else if (myGame.buttonState === WAITING) {
             button.textContent = "Start";
             if (myGame.firstPlayer === myChar) {
                 button.disabled = false;
@@ -260,7 +305,10 @@ async function pollServer() {
     return;
 }
 
-// Button click logic, flip/start/clear
+/**
+ * Handles button clicks for Flip/Clear/Start.
+ * @function onButtonClick
+ */
 function onButtonClick() {
     buttontext = button.textContent;
     console.log(buttontext + " button clicked");
@@ -281,19 +329,31 @@ function onButtonClick() {
     }
 }
 
+/**
+ * Handles coin flip to determine first player.
+ * @function onFlip
+ */
 async function onFlip() {
     let playerChars = ["X", "O"];
     myGame.firstPlayer = playerChars[Math.floor(Math.random() * 2)]; // Random number 1 - 2
     myGame.currentPlayer = myGame.firstPlayer;
-    myGame.buttonState = "isWaitingToStart";
+    myGame.buttonState = WAITING;
     clearBoard();
 }
 
+/**
+ * Handles game start after flip.
+ * @function onStart
+ */
 async function onStart() {
-    myGame.buttonState = "isPlaying";
+    myGame.buttonState = PLAYING;
     await putToken();
 }
 
+/**
+ * Handles clearing the board.
+ * @function onClear
+ */
 async function onClear(){
     clearBoard();
 }
@@ -303,7 +363,7 @@ function onCellClick(event) {
     const targetCell = event.target;
     console.log("Cell clicked");
 
-    if (myGame.buttonState != "isPlaying" 
+    if (myGame.buttonState != PLAYING 
         || targetCell.classList.contains("filled") 
         || myGame.currentPlayer !== myChar) {
         return;
@@ -320,7 +380,10 @@ function onCellClick(event) {
 
 // #region Initialization
 
-// Verify client can communicate with server, track the order this client joined
+/**
+ * Connects to the server and retrieves game ID and player character.
+ * @function connectToServer
+ */
 async function connectToServer() {
     const connection = await fetch('/join');
     let myInfo = await connection.json();
@@ -330,9 +393,10 @@ async function connectToServer() {
     startPolling();
 }
 
-// Create display (called on HTML parsed in index.html)
-// Gameboard ID = "board"
-// Button ID = "button"
+/**
+ * Creates the game display with a board, button, and infobar.
+ * @function createDisplay
+ */
 function createDisplay() {
     // Game board
     let table = document.createElement('table');
@@ -364,7 +428,8 @@ function createDisplay() {
     connectToServer();
 }
 
-/** Starts polling the server for updates.
+/** 
+ * Starts polling the server for updates.
  * @function startPolling
  */
 function startPolling() {

@@ -4,7 +4,6 @@ const port = 3000 || process.env.PORT;
 
 const path = require('path');
 const fs = require('fs');
-const { Console } = require('console');
 
 app.use('/static', express.static(path.join(__dirname, '/public/')));
 app.use(express.json());
