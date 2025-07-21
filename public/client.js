@@ -150,7 +150,7 @@ function allSameCells(arr) {
 }
 
 // Check the board for a winner
-function checkBoardWinner() {
+async function checkBoardWinner() {
     let winningArr = [];
     let winnerExists = false;
 
@@ -223,6 +223,7 @@ function checkBoardWinner() {
         }
 
         myGame.buttonState = WIN;
+        await putToken();
     }
 }
 
@@ -329,8 +330,8 @@ async function pollServer() {
             button.disabled = false;
             updateInfoBar(`Press clear to restart the game. Current player is ${myGame.currentPlayer}.`);
             
-            checkBoardWinner();
             updateBoardHTML();
+            checkBoardWinner();
         }
     }
 
