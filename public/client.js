@@ -240,6 +240,8 @@ async function clearBoard() {
         }
     }
 
+    myGame.buttonState = WAITING;
+
     await putToken();
 }
 
@@ -303,10 +305,13 @@ async function pollServer() {
         updateInfoBar("Waiting for player 2...");
         return;
     } else {
+        if (!myGame.buttonState) {
+            updateInfoBar("Waiting...");
+        }
         if (myGame.buttonState === WIN) {
+            checkBoardWinner();
             button.disabled = false;
-            let winchar = (myChar === myGame.currentPlayer ? myChar : (myChar === "X" ? "O" : "X"));
-            updateInfoBar(`${winchar} has won!`);
+            updateInfoBar(`${winnerChar} has won! Press clear to restart.`);
         } else if (myGame.buttonState === FLIPPING) {
             button.textContent = "Flip";
             if (myChar === "X") {
@@ -325,9 +330,11 @@ async function pollServer() {
                 button.disabled = true;
                 updateInfoBar(`${myGame.firstPlayer} is going first! Wait for them to start!`)
             }
+            clearBoard();
         } else {
             button.textContent = "Clear";
             button.disabled = false;
+
             updateInfoBar(`Press clear to restart the game. Current player is ${myGame.currentPlayer}.`);
             
             updateBoardHTML();
