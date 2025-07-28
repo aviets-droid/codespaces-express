@@ -10,7 +10,7 @@ const BOARD_COLS = 4;
 const WHITESPACE = "\u00A0";
 const POLL_INTERVAL = 1000;
 
-// Game states (buttonState)
+// Game states (buttonState enum)
 const FLIPPING = "needsFlip";
 const WAITING = "isWaitingToStart";
 const PLAYING = "isPlaying";
@@ -131,7 +131,12 @@ async function updateServerBoard() {
 
 // #region Gameplay
 
-// Given an array of cells, check the textContent of all elements, return true if all equal
+/**
+ * Checks if all cells in the given array have the same character.
+ * @function allSameCells
+ * @param {Array<string>} arr - Array of cells to check if all have the same character.
+ * @returns {boolean} - Returns true if all cells in the array have the same character.
+ */
 function allSameCells(arr) {
     let arrLen = arr.length;
     let charArr = [];
@@ -151,6 +156,12 @@ function allSameCells(arr) {
     return isSame;
 }
 
+/**
+ * Checks if a win is blocked by both players in the given array.
+ * @function winBlocked
+ * @param {Array<string>} arr - Array of cells to check for blocked win.
+ * @returns {boolean} - Returns true if the array has both "X" and "O" in it, indicating a blocked win.
+ */
 function winBlocked(arr){
     let arrLen = arr.length;
     let charArr = [];
@@ -168,7 +179,11 @@ function winBlocked(arr){
     return false;
 }
 
-// Check the board for a winner
+/**
+ * Checks the board for a winner or draw.
+ * @function checkBoardWinner
+ * @returns {void}
+ */
 async function checkBoardWinner() {
     let winningArr = [];
     let winnerChar = "";
@@ -278,6 +293,10 @@ async function checkBoardWinner() {
 
 // #region Updaters
 
+/**
+ * Updates the game display based on the current game state.
+ * @function updateGameDisplay
+ */
 function updateGameDisplay() {
     updateBoardHTML();
     checkBoardWinner();
@@ -331,6 +350,10 @@ function updateGameDisplay() {
     }
 }
 
+/**
+ * Clears the game board and resets the game state.
+ * @function clearBoard
+ */
 async function clearBoard() {
     if (boardCells.length != BOARD_COLS) {
         updateInfoBar("Error: unexpected boardData length");
@@ -352,7 +375,8 @@ function updateInfoBar(info) {
 }
 
 /**
- * Update board visually from boardState
+ * Update board visually from boardState.
+ * @function updateBoardHTML
  */
 function updateBoardHTML() {
     for (let i=0; i<BOARD_ROWS; i++) {
