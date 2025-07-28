@@ -84,6 +84,8 @@ async function putToken() {
         body: JSON.stringify(myGame)
     });
     const result = await response.json();
+    if (result.success === true)
+        updateGameDisplay();
     return result.success;
 }
 
@@ -109,10 +111,6 @@ async function getToken() {
     }
 }
 
-// #endregion
-
-// #region Gameplay
-
 /**
  * Updates server's board data with current board state.
  * @function updateServerBoard
@@ -129,13 +127,17 @@ async function updateServerBoard() {
     await putToken();
 }
 
+// #endregion
+
+// #region Gameplay
+
 // Given an array of cells, check the textContent of all elements, return true if all equal
 function allSameCells(arr) {
     let arrLen = arr.length;
     let charArr = [];
 
     // Populate charArr with textcontents from arr
-    for (i=0; i<arrLen; i++) {
+    for (let i=0; i<arrLen; i++) {
         charArr[i] = arr[i].textContent;
     }
 
@@ -149,14 +151,37 @@ function allSameCells(arr) {
     return isSame;
 }
 
+function winBlocked(arr){
+    let arrLen = arr.length;
+    let charArr = [];
+
+    // Populate charArr with textcontents from arr
+    for (let i=0; i<arrLen; i++) {
+        charArr[i] = arr[i].textContent;
+    }
+
+    // Check if array has X's and O's in any cell
+    if (charArr.includes("X") && charArr.includes("O")){
+        return true;
+    }
+
+    return false;
+}
+
 // Check the board for a winner
 async function checkBoardWinner() {
     let winningArr = [];
+    let winnerChar = "";
     let winnerExists = false;
+    let drawExists = true;
 
     // Row
     for (let i=0; i<BOARD_ROWS; i++) {
         let rowArr = boardCells[i];
+
+        if (drawExists){
+            drawExists = winBlocked(rowArr);
+        }
 
         if (allSameCells(rowArr)) {
             winningArr = rowArr;
@@ -169,8 +194,12 @@ async function checkBoardWinner() {
     for (let i=0; i<BOARD_COLS; i++) {
         let colArr = [];
 
-        for (j=0; j<BOARD_ROWS; j++) {
+        for (let j=0; j<BOARD_ROWS; j++) {
             colArr.push(boardCells[j][i]);
+        }
+
+        if (drawExists){
+            drawExists = winBlocked(colArr);
         }
 
         if (allSameCells(colArr)) {
@@ -185,6 +214,11 @@ async function checkBoardWinner() {
     for (let i=0; i<BOARD_ROWS; i++) {
         NDiagonalArr.push(boardCells[i][i]);
     }
+
+    if (drawExists){
+        drawExists = winBlocked(NDiagonalArr);
+    }
+    
     if (allSameCells(NDiagonalArr)) {
         winningArr = NDiagonalArr;
         winnerChar = NDiagonalArr[0].textContent;
@@ -198,6 +232,11 @@ async function checkBoardWinner() {
         PDiagonalArr.push(boardCells[i][maxidx]);
         maxidx--;
     }
+
+    if (drawExists){
+        drawExists = winBlocked(PDiagonalArr);
+    }
+
     if (allSameCells(PDiagonalArr)) {
         winningArr = PDiagonalArr;
         winnerChar = PDiagonalArr[0].textContent;
@@ -222,8 +261,73 @@ async function checkBoardWinner() {
             winningArr[i].classList.add(cellclass);
         }
 
-        myGame.buttonState = WIN;
-        await putToken();
+        if (myGame.buttonState !== WIN) {
+            myGame.buttonState = WIN;
+            myGame.firstPlayer = winnerChar; // Set first player to winner
+        }
+        return;
+    }
+
+    if (drawExists && myGame.buttonState !== DRAW) {
+        myGame.buttonState = DRAW;
+        return;
+    }
+}
+
+// #endregion
+
+// #region Updaters
+
+function updateGameDisplay() {
+    updateBoardHTML();
+    checkBoardWinner();
+
+    switch (myGame.buttonState) {
+        case WIN:
+            button.textContent = "Clear";
+            button.disabled = false;
+            if (myGame.firstPlayer === myChar) {
+                button.disabled = false;
+                updateInfoBar(`${myGame.firstPlayer} wins! Press clear to restart.`); 
+            } else {
+                button.disabled = true;
+                updateInfoBar(`${myGame.firstPlayer} wins! Wait for them to restart.`); 
+            }
+            break;
+        case DRAW:
+            button.textContent = "Clear";
+            button.disabled = false;
+            updateInfoBar("It's a draw! Press clear to restart.");
+            break;
+        case FLIPPING:
+            button.textContent = "Flip";
+            if (myChar === "X") {
+                button.disabled = false;
+                updateInfoBar("Press flip to begin.");
+            } else {
+                button.disabled = true;
+                updateInfoBar("Waiting on X to flip...");
+            }
+            break;
+        case WAITING:
+            button.textContent = "Start";
+            if (myGame.firstPlayer === myChar) {
+                button.disabled = false;
+                updateInfoBar("Press 'Start' to begin.");
+            } else {
+                button.disabled = true;
+                updateInfoBar(`${myGame.firstPlayer} is going first. Wait for them to start.`)
+            }
+            break;
+        case PLAYING:
+            button.textContent = "Clear";
+            button.disabled = false;
+            updateInfoBar(`Press clear to restart the game. Current player is ${myGame.currentPlayer} ${myGame.currentPlayer == myChar ? "(you)" : "(other player)"}.`);
+            break;
+        default:
+            button.disabled = true;
+            updateInfoBar("Waiting...");
+            break;
     }
 }
 
@@ -239,9 +343,7 @@ async function clearBoard() {
             myGame.boardState[i][j] = WHITESPACE;
         }
     }
-
-    myGame.buttonState = WAITING;
-
+    myGame.currentPlayer = myGame.firstPlayer; // Reset current player to first player
     await putToken();
 }
 
@@ -252,19 +354,12 @@ function updateInfoBar(info) {
 /**
  * Update board visually from boardState
  */
-function updateBoardHTML(winArr) {
-    if (!myGame.boardState) { // Return for falsy boardState values
-        return;
-    }
-
-    if (winArr) {
-        //
-    }
-
+function updateBoardHTML() {
     for (let i=0; i<BOARD_ROWS; i++) {
         for (let j=0; j<BOARD_COLS; j++) {
             boardCells[i][j].textContent = myGame.boardState[i][j];
-            if (["X", "O"].includes(boardCells[i][j])) {
+            boardCells[i][j].className = "cell";
+            if (["X", "O"].includes(myGame.boardState[i][j])) {
                 boardCells[i][j].classList.add("filled");
             }
         }
@@ -298,7 +393,7 @@ async function pollServer() {
     }
 
     console.log("Button state: " + myGame.buttonState);
-
+    
     if (myGame.playerCount !== 2) {
         let button = document.getElementById('button');
         button.disabled = true;
@@ -307,42 +402,10 @@ async function pollServer() {
     } else {
         if (!myGame.buttonState) {
             updateInfoBar("Waiting...");
+            return;
         }
-        if (myGame.buttonState === WIN) {
-            checkBoardWinner();
-            button.disabled = false;
-            updateInfoBar(`${winnerChar} has won! Press clear to restart.`);
-        } else if (myGame.buttonState === FLIPPING) {
-            button.textContent = "Flip";
-            if (myChar === "X") {
-                button.disabled = false;
-                updateInfoBar("Press flip to begin.");
-            } else {
-                button.disabled = true;
-                updateInfoBar("Waiting on X to flip...");
-            }
-        } else if (myGame.buttonState === WAITING) {
-            button.textContent = "Start";
-            if (myGame.firstPlayer === myChar) {
-                button.disabled = false;
-                updateInfoBar("Press 'Start' to begin.");
-            } else {
-                button.disabled = true;
-                updateInfoBar(`${myGame.firstPlayer} is going first! Wait for them to start!`)
-            }
-            clearBoard();
-        } else {
-            button.textContent = "Clear";
-            button.disabled = false;
-
-            updateInfoBar(`Press clear to restart the game. Current player is ${myGame.currentPlayer}.`);
-            
-            updateBoardHTML();
-            checkBoardWinner();
-        }
+        updateGameDisplay();
     }
-
-    return;
 }
 
 /**
@@ -355,15 +418,12 @@ function onButtonClick() {
 
     switch (buttontext) {
         case "Flip":
-            button.textContent = "Start";
             onFlip();
             break;
         case "Start":
-            button.textContent = "Clear";
             onStart();
             break;
         case "Clear":
-            button.textContent = "Start";
             onClear();
             break;
     }
@@ -376,7 +436,6 @@ function onButtonClick() {
 async function onFlip() {
     let playerChars = ["X", "O"];
     myGame.firstPlayer = playerChars[Math.floor(Math.random() * 2)]; // Random number 1 - 2
-    myGame.currentPlayer = myGame.firstPlayer;
     myGame.buttonState = WAITING;
     clearBoard();
 }
@@ -395,6 +454,7 @@ async function onStart() {
  * @function onClear
  */
 async function onClear(){
+    myGame.buttonState = WAITING;
     clearBoard();
 }
 
@@ -411,8 +471,8 @@ function onCellClick(event) {
         targetCell.textContent = myChar;
         targetCell.classList.add("filled");
         myGame.currentPlayer = myChar === "X" ? "O" : "X";
+        checkBoardWinner();
         updateServerBoard();
-        // checkBoardWinner();
     }
 }
 
