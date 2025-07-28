@@ -3,7 +3,8 @@
 
 ## Website
 [Codespace](https://glowing-fortnight-q76p9gqrgxvf9v4x-3000.app.github.dev/)
-Alternatively, create new codespace from this template.
+
+(Alternatively, create new codespace from this template.)
 
 ## Rules/Controls
 - Play on two browsers/devices.
